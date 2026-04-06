@@ -10,8 +10,31 @@ export default defineConfig(() => ({
       '@': path.resolve(__dirname, '.'),
     },
   },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
   server: {
-    // HMR can be disabled via env when running automated edits.
     hmr: process.env.DISABLE_HMR !== 'true',
+    // Proxy API calls to Express backend in dev
+    // (In production, Express serves everything directly)
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/uploads': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/outputs': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/avatars': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
   },
 }));

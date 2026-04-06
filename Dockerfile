@@ -1,7 +1,7 @@
 # Use Node.js 20 slim as base
 FROM node:20-slim
 
-# Install system dependencies
+# Install system dependencies (ffmpeg + python for AI tools)
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     python3 \
@@ -15,31 +15,27 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better Docker layer caching
 COPY package*.json ./
 
-# Install Node.js dependencies
-RUN npm install
+# Install ALL Node.js dependencies (including devDependencies needed for build)
+RUN npm ci
 
-# Install Python AI dependencies (Whisper, TTS)
-RUN pip3 install --no-cache-dir --break-system-packages \
-    openai-whisper \
-    TTS
-
-# Copy application code
+# Copy all application source code
 COPY . .
 
-# Create necessary directories
+# ✅ BUILD THE FRONTEND (was missing — this creates /app/dist)
+RUN npm run build
+
+# Create persistent storage directories
 RUN mkdir -p uploads outputs avatars
 
-# Set environment variables
+# Environment
 ENV NODE_ENV=production
 ENV PORT=3000
-# Default Ollama URL for Docker (assuming host machine runs Ollama)
-ENV OLLAMA_URL=http://host.docker.internal:11434/api/generate
 
 # Expose port
 EXPOSE 3000
 
-# Start the application
+# Start the server (serves built dist/ + API routes)
 CMD ["npm", "start"]

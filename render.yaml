@@ -1,0 +1,36 @@
+# render.yaml — Render Blueprint for VINCI AI Video Editor
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: vinci-ai-editor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon           # Change to: frankfurt / singapore / ohio
+    plan: starter            # Free tier = "free" (spins down after 15 min inactivity)
+
+    # Health check — Render uses this to know when the server is ready
+    healthCheckPath: /api/health
+
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: GEMINI_API_KEY
+        sync: false          # ← Render will prompt you to fill this in the dashboard
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-2.0-flash
+
+    # Persistent disks — files survive redeploys
+    disk:
+      name: vinci-storage
+      mountPath: /app/uploads
+      sizeGB: 1
+
+    # Auto-deploy when you push to main branch
+    autoDeploy: true
+    branch: main

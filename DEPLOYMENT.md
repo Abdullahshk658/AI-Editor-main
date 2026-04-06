@@ -1,77 +1,130 @@
-# VINCI AI Video Editor - Deployment Guide
+# 🚀 VINCI AI Editor — Deployment Guide
 
-This guide outlines how to deploy the VINCI AI Video Editor for production use.
+## What Changed (Bug Fixes Applied)
 
-## 🚀 Local Deployment (Docker)
+| File | Fix |
+|------|-----|
+| `Dockerfile` | Added `RUN npm run build` — was missing, production had no `dist/` folder |
+| `vite.config.ts` | Added dev-mode proxy so `/api` routes work during local development |
+| `index.html` | Updated title from "My Google AI Studio App" to "VINCI — AI Video Editor" |
+| `.env.example` | Corrected Gemini model names (`gemini-2.5-flash` instead of nonexistent `gemini-3.1-flash`) |
+| `render.yaml` | New file — one-click Render deployment blueprint |
 
-The easiest way to run VINCI is using Docker.
+---
 
-### Prerequisites
-- [Docker](https://www.docker.com/get-started)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+## 🌐 Deploy to Render (Recommended — Free Tier Available)
 
-### Steps
-1. **Clone the repository** (if you haven't already).
-2. **Configure Environment Variables**:
-   Create a `.env` file in the root directory:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key
-   SUPABASE_URL=your_supabase_url (optional)
-   SUPABASE_ANON_KEY=your_supabase_key (optional)
+Render supports Docker natively, persistent disks, and FFmpeg — everything VINCI needs.
+
+### Step 1 — Push the fixed files to your GitHub repo
+
+```bash
+# Clone your repo
+git clone https://github.com/Abdullahshk658/AI-Editor-main.git
+cd AI-Editor-main
+
+# Replace these files with the ones from this deployment package:
+# - Dockerfile
+# - render.yaml
+# - vite.config.ts
+# - index.html
+# - .env.example
+
+git add .
+git commit -m "fix: add render.yaml, fix Dockerfile build step, fix vite proxy"
+git push origin main
+```
+
+### Step 2 — Deploy on Render
+
+1. Go to **[dashboard.render.com](https://dashboard.render.com)** → New → **Blueprint**
+2. Connect your GitHub account and select `Abdullahshk658/AI-Editor-main`
+3. Render detects `render.yaml` automatically
+4. Click **Apply** — it will ask you to fill in `GEMINI_API_KEY`
+
+> Get a free Gemini API key at: **https://aistudio.google.com**
+
+### Step 3 — Add Your API Key
+
+In Render Dashboard → `vinci-ai-editor` service → **Environment**:
+
+```
+GEMINI_API_KEY = AIza...your_key_here
+```
+
+### Step 4 — Wait for Build (~5-8 minutes)
+
+Render builds the Docker image, runs `npm run build`, then starts the server.
+
+Your app will be live at: `https://vinci-ai-editor.onrender.com`
+
+---
+
+## 🗄️ Database (Supabase)
+
+The app **does not currently use Supabase** — all data is in-memory or on disk.
+
+If you want to add it later (for user auth, project storage, etc):
+
+1. Create a new Supabase project at **[supabase.com](https://supabase.com)**
+2. Add to Render environment variables:
    ```
-3. **Build and Start**:
-   ```bash
-   docker-compose up --build -d
+   SUPABASE_URL = https://your-project.supabase.co
+   SUPABASE_ANON_KEY = your-anon-key
    ```
-4. **Access the App**:
-   Open your browser and navigate to `http://localhost:3000`.
 
 ---
 
-## 🪟 Windows Local Setup (Non-Docker)
+## 💻 Local Development
 
-If you prefer to run it directly on Windows:
+```bash
+# 1. Clone
+git clone https://github.com/Abdullahshk658/AI-Editor-main.git
+cd AI-Editor-main
 
-### 1. Install FFmpeg
-- Download from [ffmpeg.org](https://ffmpeg.org/download.html).
-- Add the `bin` folder to your system's `PATH`.
-- Verify: `ffmpeg -version` in CMD.
+# 2. Install dependencies
+npm install
 
-### 2. Install Python & AI Models
-- Install [Python 3.10+](https://www.python.org/).
-- Install dependencies:
-  ```bash
-  pip install openai-whisper TTS
-  ```
+# 3. Create .env file
+cp .env.example .env
+# Edit .env and add your GEMINI_API_KEY
 
-### 3. Install Node.js
-- Install [Node.js 20+](https://nodejs.org/).
-- Run:
-  ```bash
-  npm install
-  npm run dev
-  ```
+# 4. Start dev server (Express + Vite HMR together)
+npm run dev
+
+# App runs at http://localhost:3000
+```
 
 ---
 
-## ☁️ Online Deployment (Cloud)
+## 🐳 Local Docker
 
-### Render / Railway / Fly.io
-1. Connect your GitHub repository.
-2. Set the build command: `npm run build`.
-3. Set the start command: `npm start`.
-4. Add your `GEMINI_API_KEY` to the environment variables.
-5. Ensure the platform supports FFmpeg (most do via buildpacks).
-
-### VPS (Ubuntu/Debian)
-1. Install Docker and Docker Compose.
-2. Follow the **Local Deployment (Docker)** steps above.
-3. Use Nginx as a reverse proxy for SSL (Port 443 -> 3000).
+```bash
+docker build -t vinci-ai .
+docker run -p 3000:3000 -e GEMINI_API_KEY=your_key vinci-ai
+```
 
 ---
 
-## 🛠️ Troubleshooting
+## ⚙️ Environment Variables Reference
 
-- **FFmpeg not found**: Ensure FFmpeg is installed and in your PATH.
-- **AI Models failing**: Check if Python is installed and `whisper` is accessible from the command line.
-- **Upload limits**: If deploying behind a proxy (like Nginx), ensure `client_max_body_size` is set high enough (e.g., `500M`).
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `GEMINI_API_KEY` | ✅ Yes | — | Google AI Studio API key |
+| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Primary AI model |
+| `GEMINI_FALLBACK_MODEL` | No | `gemini-2.0-flash` | Fallback model |
+| `NODE_ENV` | No | `development` | Set to `production` on Render |
+| `PORT` | No | `3000` | Server port |
+
+---
+
+## 🩺 Health Check
+
+Once deployed, verify at:
+```
+GET https://vinci-ai-editor.onrender.com/api/health
+```
+Should return:
+```json
+{ "status": "ok", "uptime": 42, "env": "production" }
+```
