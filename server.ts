@@ -636,6 +636,28 @@ const getLowMemoryVideoOutputOptions = () => {
   return [`-c:v ${HW_ENCODER}`, '-preset superfast', '-crf 23'];
 };
 
+const buildAtempoFilterChain = (speed: number): string[] => {
+  if (!Number.isFinite(speed) || speed <= 0) {
+    return [];
+  }
+
+  const filters: string[] = [];
+  let remainingSpeed = speed;
+
+  while (remainingSpeed > 2) {
+    filters.push('atempo=2');
+    remainingSpeed /= 2;
+  }
+
+  while (remainingSpeed < 0.5) {
+    filters.push('atempo=0.5');
+    remainingSpeed /= 0.5;
+  }
+
+  filters.push(`atempo=${Number(remainingSpeed.toFixed(6))}`);
+  return filters;
+};
+
 const getCanvasSize = (aspectRatio: TimelineAspectRatio) => (
   aspectRatio === '9:16'
     ? { width: 1080, height: 1920 }
@@ -905,7 +927,7 @@ const runFFmpeg = (inputPath: string, outputPath: string, options: any) => {
       audioFilters.push('highpass=f=150', 'lowpass=f=4000', 'afftdn');
     }
     if (options.normalizeAudio) {
-      audioFilters.push('loudnorm=I=-16:TP=-1.5:LRA=11');
+      audioFilters.push('dynaudnorm=p=0.9:s=5');
     }
 
     if (options.trim) {
@@ -918,7 +940,7 @@ const runFFmpeg = (inputPath: string, outputPath: string, options: any) => {
     }
 
     if (options.crop) {
-      videoFilters.push('crop=ih*9/16:ih');
+      videoFilters.push("crop=min(iw\\,ih*9/16):ih:(iw-min(iw\\,ih*9/16))/2:0,scale=1080:1920");
     }
 
     // Video Filters
@@ -938,9 +960,14 @@ const runFFmpeg = (inputPath: string, outputPath: string, options: any) => {
       });
     }
 
-    if (options.speed) {
-      videoFilters.push(`setpts=${1/options.speed}*PTS`);
-      audioFilters.push(`atempo=${options.speed}`);
+    if (options.speed !== undefined) {
+      const speed = Number(options.speed);
+      if (Number.isFinite(speed) && speed > 0 && speed !== 1) {
+        videoFilters.push(`setpts=${1 / speed}*PTS`);
+        audioFilters.push(...buildAtempoFilterChain(speed));
+      } else if (!Number.isFinite(speed) || speed <= 0) {
+        logger.warn(`Skipping invalid speed factor for FFmpeg job ${options.jobId || 'unknown'}: ${options.speed}`);
+      }
     }
 
     if (videoFilters.length > 0) ff = ff.videoFilters(videoFilters);
