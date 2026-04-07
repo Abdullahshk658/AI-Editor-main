@@ -909,7 +909,12 @@ const runFFmpeg = (inputPath: string, outputPath: string, options: any) => {
     }
 
     if (options.trim) {
-      ff = ff.setStartTime(options.trim.start).setDuration(options.trim.duration);
+      // Use output-side trim filter instead of input seek (-ss before -i)
+      // Input seek conflicts with video filter chains in fluent-ffmpeg
+      const trimStart = Number(options.trim.start) || 0;
+      const trimDuration = Number(options.trim.duration);
+      videoFilters.unshift(`trim=start=${trimStart}:duration=${trimDuration},setpts=PTS-STARTPTS`);
+      audioFilters.unshift(`atrim=start=${trimStart}:duration=${trimDuration},asetpts=PTS-STARTPTS`);
     }
 
     if (options.crop) {
